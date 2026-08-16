@@ -1,0 +1,36 @@
+{
+  "name": "@dsh-plugins/agnes-image",
+  "version": "1.0.0",
+  "description": "DSH plugin for Agnes AI image generation (text-to-image)",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.yml"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "build:host": "tsc -p tsconfig.json",
+    "dev": "tsdown --watch"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-attachment": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-attachment-local": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-credentials": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.5"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dingpenghui-good/dsh-plugins.git"
+  }
+}

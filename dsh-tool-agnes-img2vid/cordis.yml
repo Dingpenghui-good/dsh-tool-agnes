@@ -1,0 +1,6 @@
+# 插件入口 - 使用本地源码
+- id: tool-agnes-img2vid
+  name: './src/index.ts'
+  config:
+    pollIntervalMs: 5000
+    timeoutMs: 300000
