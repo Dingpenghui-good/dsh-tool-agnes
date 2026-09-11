@@ -1,115 +1,84 @@
-# Agnes AI 视频生成插件
+# @dingpenghui/agnes-video
 
-为 DeepSeek Harness 添加视频生成能力，使用 Agnes AI 的 `agnes-video-v2.0` 模型。
+DSH 插件：Agnes AI **文生视频**，注册 `generate_video` 与 `get_video_task` 两个工具。
 
-## 已安装位置
+## 能力
 
-| 文件/目录 | 说明 |
-|-----------|------|
-| `E:\dsh-workspace\dsh-tool-agnes-video\` | 插件源码 |
-| `C:\Users\dph\.dsh\profiles\web\cordis.yml` | DSH Web profile 配置 |
-| `C:\Users\dph\.dsh\settings.yaml` | LLM 提供商配置 |
+- 调用 `POST /v1/videos` 创建异步任务，再轮询 `GET /agnesapi?video_id=…`
+- **默认非阻塞**：渲染以 DSH 后台任务（`ctx.jobs`）运行，调用立即返回 `taskId` + `jobId`
+- 同时支持两代请求形状：
+  - **V2.0**（`agnes-video-v2.0`，免费）：`width` / `height` / `num_frames` / `frame_rate`
+  - **2.5 系列**（按秒计费）：`seconds` / `mode` / `size` / `aspect_ratio`
+- 轮询状态机综合 `status` / `internal_status` / `completed_at` / `error` 判定；URL 取**顶层 `url`**
+- 产物下载进附件存储，返回 `attachment`
+- 非瞬时失败（限流、鉴权）立即抛出，只有瞬时错误才计入重试预算
 
-## 快速开始
+## 配置
 
-### 1. 重启 DSH
-
-```bash
-cd E:\deepseek-harness
-pnpm dsh web
-```
-
-### 2. 在对话中使用
-
-直接告诉 AI 你想生成什么视频：
-
-```
-帮我生成一个视频：一只猫咪在阳光明媚的草地上奔跑
-```
-
-```
-创建一个沙漠日落的视频，时长 8 秒，1080p 分辨率
-```
-
-### 3. 工具参数
-
-| 参数 | 类型 | 必填 | 默认值 |
-|------|------|------|--------|
-| `prompt` | string | ✅ | - | 视频描述 |
-| `duration` | integer | ❌ | 4 | 时长（秒） |
-| `width` | integer | ❌ | 720 | 宽度（像素） |
-| `height` | integer | ❌ | 1280 | 高度（像素） |
-| `fps` | integer | ❌ | 8 | 帧率 |
-
-## 技术说明
-
-### API 端点
-
-- **Base URL**: `https://apihub.agnes-ai.com/v1`
-- **模型**: `agnes-video-v2.0`
-- **认证**: Bearer Token（从 `AGNES_API_KEY` 读取）
-
-### 工作流程
-
-```
-用户请求 → 创建任务 → 轮询状态 → 返回视频 URL
-              ↓              ↓
-         POST /video/   GET /video/{id}
-         generations    generations/{id}
-```
-
-### 超时处理
-
-- 默认超时：5 分钟
-- 轮询间隔：5 秒
-- 最大轮询次数：60 次
-
-## 故障排除
-
-### API Key 错误
-
-```
-Error: AGNES_API_KEY is not set
-```
-
-解决方法：
-```powershell
-$env:AGNES_API_KEY = "your-api-key"
-```
-
-或在 `C:\Users\dph\.dsh\.credentials.yaml` 中配置：
 ```yaml
-AGNES_API_KEY: your-api-key-here
+- id: tool-agnes-video
+  name: '@dingpenghui/agnes-video'
+  config:
+    model: agnes-video-v2.0      # 或 agnes-video-2.5 / -2.5-flash / -2.5-fast
+    pollIntervalMs: 5000
+    timeoutMs: 900000            # 后台预算；实测一次 8 秒 1080p 约 272 秒
+    maxConsecutiveFailures: 4
+    ferryContext: true
+    awaitCompletion: false       # true 则回到工具内阻塞等待
+    persistVideo: true           # 完成后下载到附件存储
 ```
 
-### 视频生成失败
+凭据：`AGNES_API_KEY` 或首选 `AGNES_AI_API_KEY`。
 
-当前 Agnes AI 的视频生成 API 端点可能尚未公开。如果遇到以下错误：
+## 工具
+
+### generate_video
+
+| 参数 | 类型 | 默认 | 适用 |
+|------|------|------|------|
+| `prompt` | string | - | 全部（必填） |
+| `model` | string | 配置值 | 全部 |
+| `duration` | integer | 8 | 全部（秒） |
+| `width` / `height` | integer | 1920 / 1080 | 仅 V2.0 |
+| `frameRate` | integer | 24 | 仅 V2.0 |
+| `size` | string | 720P | 仅 2.5 |
+| `aspectRatio` | string | 16:9 | 仅 2.5 |
+| `seed` / `negativePrompt` | - | - | 全部 |
+
+### get_video_task
+
+| 参数 | 类型 | 必填 |
+|------|------|------|
+| `jobId` | string | ✅ |
+
+**幂等**：任务运行中返回 `processing`，完成后返回 `completed` + `videoUrl` + 本地 `attachment`。
+
+## 异步工作流
 
 ```
-Video generation failed: 无效的令牌
+1. generate_video { prompt: "..." }   → { taskId, jobId: "agnes-video-1", status: "queued" }
+2. （等待，任务完成时 DSH 会通知）
+3. get_video_task { jobId: "agnes-video-1" } → { status: "completed", videoUrl, attachment }
 ```
 
-这可能是：
-1. API Key 未授权视频生成权限
-2. 视频生成功能需要额外申请
-3. API 端点尚未完全部署
+`queued` 之后**不要**重复发起同一次生成。需要旧行为时设 `awaitCompletion: true`。
 
-建议联系 Agnes AI 支持确认视频生成 API 的可用性。
+## 注意
 
-## 插件结构
+- 请求 `1920x1080` 会被服务端吸附为 **`1920x1088`**，返回值里的 `sizeAdjustment` 会说明原因。
+- 免费 Key 对 2.5 系列返回 `429 rate_limit_exceeded`，且**不应立即重试**。
+- 后台任务依赖 base bundle 的 `dsh-jobs-local`；缺失时会退化为只报 `taskId`。
 
-```
-dsh-tool-agnes-video/
-├── src/
-│   └── index.ts      # 主入口，defineTool + apply
-├── package.json      # 包配置
-├── cordis.yml        # Cordis 插件配置
-├── README.md         # 文档
-└── USAGE.md          # 使用说明
+## 开发
+
+```powershell
+pnpm install
+pnpm build
+npx tsc -p tsconfig.json --noEmit
 ```
 
-## 相关文档
+协议实现位于上层的 [`_core/`](../_core)，构建时内联进 `lib/`。
 
-- [DSH 插件开发指南](https://github.com/deepseek-ai/deepseek-harness)
-- [Agnes AI API 文档](https://agnes-ai.com/)
+完整说明见 [上级 README](../README.md)；优化记录见 [OPTIMIZATION.md](../OPTIMIZATION.md)。
+
+MIT

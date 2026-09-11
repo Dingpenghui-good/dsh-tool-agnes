@@ -1,3 +1,21 @@
-# 插件入口 - 使用本地源码
+# Cordis bundle patch for @dingpenghui/agnes-image.
+#
+# Mounted either as a profile bundle (via package.json `dsh.bundle.patch`) or
+# explicitly from a profile's cordis.patch.yml:
+#
+#   - insert:
+#       - id: tool-agnes-image
+#         name: '@dingpenghui/agnes-image'
+#         config:
+#           model: agnes-image-2.5-flash
+#
+# Every key the row owns must be restated, because a patch replaces the
+# targeted row's whole config.
 - id: tool-agnes-image
-  name: './src/index.ts'
+  name: '@dingpenghui/agnes-image'
+  config:
+    model: agnes-image-2.5-flash
+    defaultSize: 1K
+    defaultRatio: 1:1
+    persistAttachment: true
+    ferryContext: true

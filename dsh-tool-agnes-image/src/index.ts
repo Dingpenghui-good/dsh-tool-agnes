@@ -1,25 +1,24 @@
 /**
- * Agnes AI image generation tool plugin for DeepSeek Harness.
- * Integrates agnes-image-2.1-flash model for text-to-image generation.
+ * Agnes AI text-to-image generation tool for DeepSeek Harness.
  *
- * Two tools are registered:
- *  - generate_image:        full tool — downloads image, saves to attachment store,
- *                           renders [text, image] ContentBlock pair; for subagents
- *                           also calls exec.deferContext so the image appears in
- *                           the parent conversation.
- *  - generate_image_simple: internal helper — same API call but returns plain JSON
- *                           (no attachment persistence, no deferContext).
- * @module @deepseek-ai/dsh-tool-agnes-image
+ * Registers one model-facing tool, `generate_image`, which calls the Agnes
+ * OpenAI-compatible image endpoint, persists the result as a durable
+ * attachment, and renders it inline in the conversation.
+ *
+ * @module @dingpenghui/agnes-image
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { detectImage } from '@deepseek-ai/dsh-attachment-local'
-import { readCredential } from './credential.ts'
-import type { AgnesImageResponse } from './types.ts'
+import { readCredential } from '../../_core/credential.ts'
+import { AGNES_BASE_URL } from '../../_core/http.ts'
+import { IMAGE_MODELS, fetchImageBytes, generateImage } from '../../_core/image.ts'
+import { sniffImageMediaType } from '../../_core/media.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'tool-agnes-image'
@@ -27,253 +26,256 @@ export const name = 'tool-agnes-image'
 /** Services required by the image generation plugin. */
 export const inject = ['tools'] as const
 
-const BASE_URL = 'https://apihub.agnes-ai.com/v1'
-const MODEL = 'agnes-image-2.1-flash'
+/** Resolution tiers accepted by the Agnes image endpoint. */
+const SIZES = ['1K', '2K', '3K', '4K'] as const
 
+/** Aspect ratios accepted by the Agnes image endpoint. */
+const RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9'] as const
+
+/** Deployment configuration for the image tool. */
+export interface Config {
+  /** Image model id sent to the endpoint. */
+  model: string
+  /** Resolution tier used when the model omits `size`. */
+  defaultSize: (typeof SIZES)[number]
+  /** Aspect ratio used when the model omits `ratio`. */
+  defaultRatio: (typeof RATIOS)[number]
+  /** Whether the generated image is persisted and rendered inline. */
+  persistAttachment: boolean
+  /** Whether a nested dispatch (PTC sub-call) also ferries the image outward. */
+  ferryContext: boolean
+  /** Per-request time budget in milliseconds. */
+  timeoutMs: number
+}
+
+/** Schemastery configuration for the image tool. */
+export const Config: z<Config> = z.object({
+  model: z.string().default(IMAGE_MODELS[0]),
+  defaultSize: z.union([...SIZES]).default('1K'),
+  defaultRatio: z.union([...RATIOS]).default('1:1'),
+  persistAttachment: z.boolean().default(true),
+  ferryContext: z.boolean().default(true),
+  timeoutMs: z.natural().default(240_000),
+})
+
+/** Model-facing argument shape of `generate_image`. */
 type GenerateImageArgs = {
   prompt: string
-  size: '1K' | '2K' | '3K' | '4K'
-  ratio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '3:2' | '2:3'
-  format: 'url' | 'b64_json'
-}
-
-interface GenerateImageValue {
-  url: string
-  text: string
-  attachment: ImageAttachmentRef
-}
-
-interface GenerateImageSimpleValue {
-  url: string
-  text: string
-}
-
-function formatOutputText(args: GenerateImageArgs, response: AgnesImageResponse): string {
-  const data = response.data?.[0] ?? null
-  const b64 = data?.b64_json ?? null
-  const url = data?.url ?? null
-  return [
-    '**图像已生成**',
-    `- **模型**: ${MODEL}`,
-    `- **提示词**: ${args.prompt.slice(0, 100)}${args.prompt.length > 100 ? '...' : ''}`,
-    data?.size ? `- **分辨率**: ${data.size}` : null,
-    data?.width && data?.height ? `- **尺寸**: ${data.width} x ${data.height}` : null,
-    data?.ratio ? `- **宽高比**: ${data.ratio}` : null,
-    url ? `- **链接**: ${url}` : null,
-    b64 ? `- **Base64**: (已截断，长度=${b64.length})` : null,
-    response.usage ? `- **Token 消耗**: ${JSON.stringify(response.usage)}` : null,
-  ].filter(Boolean).join('\n')
+  size?: (typeof SIZES)[number]
+  ratio?: (typeof RATIOS)[number]
 }
 
 /**
- * Render function shared by both tools.
- * Returns [text, image] for the main tool, [text] for the simple variant.
+ * Attachment projection. Deliberately narrow: the output schema is enforced
+ * with `additionalProperties: false`, so a durable reference carrying extra
+ * fields (a display name, original dimensions) would be rejected verbatim.
  */
-function renderGenerateImage(_args: GenerateImageArgs, value: GenerateImageValue | GenerateImageSimpleValue): ContentBlock[] {
-  const typed = value as GenerateImageValue
-  if (!(typed.attachment !== undefined)) {
-    return [{ type: 'text', text: (value as GenerateImageSimpleValue).text }]
-  }
-  return [
-    { type: 'text', text: typed.text },
-    { type: 'image', attachment: typed.attachment },
-  ]
+interface AttachmentSummary {
+  attachmentId: string
+  mediaType: string
+  bytes: number
+  width: number
+  height: number
 }
 
-/** Persist image bytes to the attachment store and return the reference. */
-async function saveImageFromUrl(ctx: Context, imageUrl: string, prompt: string): Promise<ImageAttachmentRef> {
-  const res = await fetch(imageUrl)
-  if (!res.ok) throw new Error(`failed to fetch generated image: HTTP ${res.status}`)
-  const buffer = Buffer.from(await res.arrayBuffer())
-  const data = new Uint8Array(buffer)
-
-  const imageInfo = await detectImage(data)
-  const mediaType: ImageMediaType = imageInfo.mediaType
-
-  const attachments = ctx.get('attachments')
-  if (attachments === undefined) {
-    throw new Error('attachment service not available — cannot persist generated image')
-  }
-
-  const ref = await attachments.saveImage({
-    data,
-    mediaType,
-    name: `agnes-image-${prompt.slice(0, 20)}.png`,
-  })
-  return ref
+/** Canonical value of `generate_image`. */
+interface GenerateImageValue {
+  url?: string
+  text: string
+  attachment?: AttachmentSummary
 }
 
-/** Plugin entry point: register tools into the given context. */
-export function apply(ctx: Context): void {
-  // ──────────────────────────────────────────────
-  // Main tool: generate_image
-  //   Downloads image → persists to attachment store
-  //   Returns { url, text, attachment }
-  //   render() → [text, image] ContentBlock pair (inline preview in conversation)
-  //   deferContext() → injects image block for subagent → parent propagation
-  // ──────────────────────────────────────────────
+/**
+ * Project a durable attachment reference onto the always-valid summary.
+ * @param ref - the reference returned by the attachment store.
+ * @returns the projection declared by the tool's output schema.
+ */
+function summarizeAttachment(ref: ImageAttachmentRef): AttachmentSummary {
+  return {
+    attachmentId: String(ref.attachmentId),
+    mediaType: ref.mediaType,
+    bytes: ref.bytes,
+    width: ref.width,
+    height: ref.height,
+  }
+}
+
+/**
+ * Rebuild the image content block from the canonical summary.
+ * @param attachment - the projected summary.
+ * @returns the model/UI-facing image block.
+ */
+function imageBlock(attachment: AttachmentSummary): ContentBlock {
+  return {
+    type: 'image',
+    attachment: {
+      attachmentId: attachment.attachmentId,
+      mediaType: attachment.mediaType,
+      bytes: attachment.bytes,
+      width: attachment.width,
+      height: attachment.height,
+    },
+  } as unknown as ContentBlock
+}
+
+/**
+ * Register the Agnes image tool.
+ * @param ctx - plugin context.
+ * @param config - resolved deployment configuration.
+ */
+export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'generate_image',
-    description: `调用 Agnes AI 图像生成模型生成图像。
-返回生成图像的 URL，并将图像以内联预览形式嵌入对话。
-适用于：角色立绘、场景概念图、UI 原型、产品插图等所有图像生成需求。
-模型: ${MODEL}`,
+    description: `Generate an image with the Agnes AI image model and embed the result inline in the conversation.
+Use it for illustrations, character art, concept art, UI mockups, product shots, posters, and any other still-image request.
+Write a specific, descriptive English prompt (subject, composition, lighting, style) rather than a short phrase.
+Returns the image URL plus a durable attachment reference.
+
+The endpoint is text-to-image only: it rejects image-to-image input and any batch size other than one.
+
+Endpoint: ${AGNES_BASE_URL}/images/generations · model: ${config.model}`,
     parameters: {
-      prompt: { type: 'string', required: true, description: '图像生成提示词，使用英文效果最佳' },
-      size:   { type: 'string', enum: ['1K', '2K', '3K', '4K'], default: '1K', description: '图像分辨率档位：1K / 2K / 3K / 4K' },
-      ratio:  { type: 'string', enum: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'], default: '1:1', description: '宽高比：1:1 | 16:9 | 9:16 | 4:3 | 3:4 | 3:2 | 2:3' },
-      format: { type: 'string', enum: ['url', 'b64_json'], default: 'url', description: '返回格式：url 或 b64_json' },
+      prompt: {
+        type: 'string',
+        required: true,
+        description: 'Image description. English and specific (subject, composition, lighting, style) works best.',
+      },
+      size: {
+        type: 'string',
+        enum: [...SIZES],
+        default: config.defaultSize,
+        description: 'Resolution tier: 1K / 2K / 3K / 4K.',
+      },
+      ratio: {
+        type: 'string',
+        enum: [...RATIOS],
+        default: config.defaultRatio,
+        description: 'Aspect ratio: 1:1 | 16:9 | 9:16 | 4:3 | 3:4 | 3:2 | 2:3 | 21:9.',
+      },
     },
     output: {
       schema: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          url:         { type: 'string', required: true, description: '生成图像的 HTTP URL' },
+          url: {
+            type: 'string',
+            description: 'Remote HTTP URL of the generated image.',
+          },
+          text: {
+            type: 'string',
+            required: true,
+            description: 'Model-visible summary of the generation.',
+          },
           attachment: {
             type: 'object',
             additionalProperties: false,
-            required: true,
             properties: {
-              attachmentId: { type: 'string', required: true, description: '图像存储 ID' },
-              mediaType:    { type: 'string', enum: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'], required: true, description: '媒体类型' },
-              bytes:        { type: 'integer', required: true, description: '编码字节数' },
-              width:        { type: 'integer', required: true, description: '图片宽度（像素）' },
-              height:       { type: 'integer', required: true, description: '图片高度（像素）' },
+              attachmentId: { type: 'string', required: true, description: 'Durable attachment id.' },
+              mediaType: { type: 'string', required: true, description: 'Verified media type.' },
+              bytes: { type: 'integer', required: true, description: 'Encoded byte length.' },
+              width: { type: 'integer', required: true, description: 'Encoded width in pixels.' },
+              height: { type: 'integer', required: true, description: 'Encoded height in pixels.' },
             },
+            description: 'Durable copy of the generated image, when persistence succeeded.',
           },
-          text: { type: 'string', required: true, description: '结构化的图像生成摘要（模型可见）' },
         },
       },
-      render: renderGenerateImage,
+      render: (_args, value) => {
+        const typed = value as GenerateImageValue
+        const blocks: ContentBlock[] = [{ type: 'text', text: typed.text }]
+        if (typed.attachment !== undefined) blocks.push(imageBlock(typed.attachment))
+        return blocks
+      },
     },
+    presentCall: (args): ToolCallView => ({
+      card: 'generic',
+      title: `Generate image · ${args.size ?? config.defaultSize} ${args.ratio ?? config.defaultRatio}`,
+      kind: 'other',
+      rawInput: { prompt: args.prompt },
+    }),
+    presentResult: (_args, result): ToolResultView => ({
+      card: 'generic',
+      title: result.isError ? 'Image generation failed' : 'Image generation',
+      content: result.content,
+    }),
     async execute(args, exec) {
+      const typed = args as GenerateImageArgs
       const apiKey = await readCredential(ctx)
-      const typedArgs = args as GenerateImageArgs
+      const size = typed.size ?? config.defaultSize
+      const ratio = typed.ratio ?? config.defaultRatio
 
-      const body = {
-        model: MODEL,
-        prompt: typedArgs.prompt,
-        size: typedArgs.size,
-        ratio: typedArgs.ratio,
-        format: typedArgs.format,
-        stream: false,
-      }
-
-      const resp = await fetch(`${BASE_URL}/images/generations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
+      const generated = await generateImage({
+        apiKey,
+        model: config.model,
+        prompt: typed.prompt,
+        size,
+        ratio,
         signal: exec.signal,
+        timeoutMs: config.timeoutMs,
       })
 
-      if (!resp.ok) {
-        const errText = await resp.text().catch(() => '')
-        throw new Error(`Agnes image API error ${resp.status}: ${errText || resp.statusText}`)
-      }
-
-      const data = (await resp.json()) as AgnesImageResponse
-      const imageData = data.data?.[0] ?? null
-      if (!imageData) throw new Error('No image data returned from Agnes API')
-
-      const url = imageData.url ?? ''
-      const text = formatOutputText(typedArgs, data)
-
-      // Save to attachment store for inline preview in the conversation UI
-      let attachment: ImageAttachmentRef | undefined
-      if (url) {
-        try {
-          attachment = await saveImageFromUrl(ctx, url, typedArgs.prompt)
-        } catch (err) {
-          console.warn('[agnes-image] Failed to persist image to attachment store:', err)
+      // Persisting is best-effort. A storage failure must not fail the call:
+      // the model already holds the URL it can report, and the reason is
+      // surfaced in the summary instead of being logged out of reach.
+      let attachment: AttachmentSummary | undefined
+      let persistNote: string | undefined
+      if (config.persistAttachment) {
+        const attachments = ctx.get('attachments')
+        if (attachments === undefined) {
+          persistNote = 'the attachment service is unavailable'
+        } else {
+          try {
+            const bytes = await fetchImageBytes(generated.image, exec.signal)
+            const ref = await attachments.saveImage({
+              data: bytes,
+              mediaType: sniffImageMediaType(bytes),
+              name: `agnes-image-${typed.prompt.slice(0, 24)}`,
+            })
+            attachment = summarizeAttachment(ref)
+          } catch (error) {
+            persistNote = error instanceof Error ? error.message : String(error)
+          }
         }
+      } else {
+        persistNote = 'disabled by configuration'
       }
+
+      const lines = [
+        '**Image generated**',
+        `- model: ${config.model}`,
+        `- size: ${size} (${ratio})`,
+        `- prompt: ${typed.prompt.slice(0, 120)}${typed.prompt.length > 120 ? '…' : ''}`,
+        generated.image.url !== undefined ? `- url: ${generated.image.url}` : '- url: (base64 response)',
+        attachment !== undefined
+          ? `- attachment: attachment:${attachment.attachmentId} (${attachment.width}x${attachment.height} ${attachment.mediaType}, ${attachment.bytes} bytes)`
+          : `- attachment: not persisted (${persistNote ?? 'unknown reason'})`,
+        attachment !== undefined
+          ? '- pass that attachment reference to generate_img2vid to animate this image'
+          : null,
+      ].filter((line): line is string => line !== null)
 
       const value: GenerateImageValue = {
-        url,
-        text,
-        attachment: attachment!,
+        text: lines.join('\n'),
+        ...(generated.image.url !== undefined ? { url: generated.image.url } : {}),
+        ...(attachment !== undefined ? { attachment } : {}),
       }
 
-      // Inject image block into conversation so subagents propagating results
-      // to their parent also surface the image inline.
-      if (exec.parent !== undefined && attachment !== undefined) {
+      // Under PTC the model reaches this tool through a `run_code` sub-call, so
+      // the image must ride the deferred context to reach the outer result.
+      if (config.ferryContext && exec.parent !== undefined && attachment !== undefined) {
         exec.deferContext(createUserMessage({
-          content: renderGenerateImage(typedArgs, value),
-          source: { kind: 'plugin', plugin: 'tool-agnes-image' },
+          content: [{ type: 'text', text: value.text }, imageBlock(attachment)],
+          source: {
+            kind: 'plugin',
+            plugin: name,
+            form: 'notice',
+            summary: `generated image: ${typed.prompt.slice(0, 80)}`,
+          },
         }))
       }
 
       return value
-    },
-  }))
-
-  // ──────────────────────────────────────────────
-  // Internal helper: generate_image_simple
-  //   Same API call but returns plain JSON (no attachment persistence,
-  //   no deferContext). Used as a fallback when generate_image is unavailable.
-  // ──────────────────────────────────────────────
-  ctx.tools.register(defineTool({
-    name: 'generate_image_simple',
-    description: `【内部辅助工具】调用 Agnes AI 生成图像并仅返回 JSON 结果，不持久化到对话附件。
-当 generate_image 工具不可用时使用此工具。
-模型: ${MODEL}`,
-    parameters: {
-      prompt: { type: 'string', required: true, description: '图像生成提示词，使用英文效果最佳' },
-      size:   { type: 'string', enum: ['1K', '2K', '3K', '4K'], default: '1K', description: '图像分辨率档位：1K / 2K / 3K / 4K' },
-      ratio:  { type: 'string', enum: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3'], default: '1:1', description: '宽高比：1:1 | 16:9 | 9:16 | 4:3 | 3:4 | 3:2 | 2:3' },
-      format: { type: 'string', enum: ['url', 'b64_json'], default: 'url', description: '返回格式：url 或 b64_json' },
-    },
-    output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          url:  { type: 'string', required: true, description: '生成图像的 HTTP URL' },
-          text: { type: 'string', required: true, description: '图像生成结果摘要' },
-        },
-      },
-      render: renderGenerateImage,
-    },
-    async execute(args, exec) {
-      const apiKey = await readCredential(ctx)
-      const typedArgs = args as GenerateImageArgs
-
-      const body = {
-        model: MODEL,
-        prompt: typedArgs.prompt,
-        size: typedArgs.size,
-        ratio: typedArgs.ratio,
-        format: typedArgs.format,
-        stream: false,
-      }
-
-      const resp = await fetch(`${BASE_URL}/images/generations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-        signal: exec.signal,
-      })
-
-      if (!resp.ok) {
-        const errText = await resp.text().catch(() => '')
-        throw new Error(`Agnes image API error ${resp.status}: ${errText || resp.statusText}`)
-      }
-
-      const data = (await resp.json()) as AgnesImageResponse
-      const imageData = data.data?.[0] ?? null
-      if (!imageData) throw new Error('No image data returned from Agnes API')
-
-      const url = imageData.url ?? ''
-      const text = formatOutputText(typedArgs, data)
-
-      return { url, text } as GenerateImageSimpleValue
     },
   }))
 }

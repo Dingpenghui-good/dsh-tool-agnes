@@ -1,17 +1,25 @@
 {
-  "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "lib/types"
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@deepseek-ai/*": ["./node_modules/@deepseek-ai/*"]
+    },
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "resolvePackageJsonExports": true,
+    "resolvePackageJsonImports": true
   },
-  "include": ["src"],
-  "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../../vendor/schemastery" },
-    { "path": "../../llm/llm" },
-    { "path": "../../core/tools" },
-    { "path": "../../attachment/attachment" },
-    { "path": "../../attachment/attachment-local" },
-    { "path": "../../credentials/credentials" }
-  ]
+  "include": ["src/**/*", "../../_core/**/*"],
+  "exclude": ["node_modules", "lib"]
 }
