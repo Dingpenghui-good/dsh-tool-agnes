@@ -30,6 +30,7 @@ import type { ImageSourceKind, ResolvedImageSource } from '../../_core/image-sou
 import { RecentImageIndex } from '../../_core/recent-images.ts'
 import { formatBytes } from '../../_core/media.ts'
 import {
+  DEFAULT_VIDEO_MODEL,
   VIDEO_MODELS,
   awaitVideoTask,
   calculateNumFrames,
@@ -73,7 +74,7 @@ export interface Config {
 
 /** Schemastery configuration for the image-to-video tool. */
 export const Config: z<Config> = z.object({
-  model: z.string().default(VIDEO_MODELS[0]),
+  model: z.string().default(DEFAULT_VIDEO_MODEL),
   pollIntervalMs: z.natural().default(5000),
   timeoutMs: z.natural().default(900_000),
   maxConsecutiveFailures: z.natural().default(4),
@@ -132,7 +133,7 @@ const PARAMETERS = {
   model: {
     type: 'string',
     enum: [...VIDEO_MODELS],
-    description: 'Video model. agnes-video-v2.0 is free and accepts width/height/frameRate; the 2.5 family is billed per second and uses size/aspectRatio instead.',
+    description: 'Video model. agnes-video-2.5-flash (the default) is the newest generation and is free; it takes duration/size/aspectRatio and pins size to "720P". agnes-video-v2.0 is the legacy shape and takes width/height/frameRate instead.',
   },
   duration: {
     type: 'integer',

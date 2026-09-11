@@ -42,7 +42,7 @@ DSH 插件：Agnes AI **图生视频**，注册 `generate_img2vid` 工具。
 - id: tool-agnes-img2vid
   name: '@dingpenghui/agnes-img2vid'
   config:
-    model: agnes-video-v2.0
+    model: agnes-video-2.5-flash
     pollIntervalMs: 5000
     timeoutMs: 900000
     maxConsecutiveFailures: 4

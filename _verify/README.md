@@ -96,7 +96,14 @@ ALL ACCEPTANCE CHECKS PASSED
 | `POST /images/generations` + `n: 2` | 400 `n must be 1` |
 | `POST /v1/videos` + `image: <url>` (V2.0) | **200**，轮询报文 `mode=ti2vid`、`image=set` |
 | `GET`/`POST /v1/files` | 端点不存在（被路由到通配 chat 路径） |
-| `POST /v1/videos` + `image: "data:image/jpeg;base64,…"` | **200** —— data URL 与公网 URL 等价 |
+| `POST /v1/videos`（v2.0）+ `image: "data:image/jpeg;base64,…"` | **200** —— data URL 与公网 URL 等价 |
+| `POST /v1/videos`（2.5）+ `mode: "image"` 或裸 `image` | 400 `invalid mode` / `mode is required` |
+| `POST /v1/videos`（2.5）+ `mode: "reference"` + `images: [url]` | **200** —— 2.5 的图生视频走 reference 模式 + 数组 |
+| 2.5 完成时的轮询报文 | `internal_status` 停在 `pending`、`internal_progress` 停在 `0`，仅 `status`/`completed_at`/`progress` 推进 |
+| `agnes-video-2.5-flash` 价格 | 文档标注现价 `$0/秒`（原 `$0.025/秒`） |
+
+> 免费 Key 有**速率限制**：短时间连续创建任务会返回 `429`。探测脚本因此需要间隔执行，
+> 上表中被 429 打断过的探测项均已重跑确认。
 
 结论：
 

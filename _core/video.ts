@@ -31,6 +31,16 @@ export const VIDEO_MODELS = [
 export type VideoModel = (typeof VIDEO_MODELS)[number]
 
 /**
+ * The default video model.
+ *
+ * `agnes-video-2.5-flash` is the newest generation and sits on the free tier
+ * (verified live: a free key creates and renders a task). `agnes-video-v2.0`
+ * stays selectable for callers that want the legacy request shape or the
+ * unrestricted `size` values.
+ */
+export const DEFAULT_VIDEO_MODEL = 'agnes-video-2.5-flash'
+
+/**
  * Whether a model belongs to the 2.5 family, which uses the newer request
  * shape (`seconds`/`mode`/`size`/`aspect_ratio`) and requires `model_name` on
  * the polling endpoint.
@@ -39,6 +49,20 @@ export type VideoModel = (typeof VIDEO_MODELS)[number]
  */
 export function isVideo25Family(model: string): boolean {
   return model.startsWith('agnes-video-2.5')
+}
+
+/**
+ * Size presets each family accepts.
+ *
+ * The 2.5 Flash model pins `size` to `720P`; the other 2.5 models and V2.0 take
+ * a wider set, so the enforcement is reported to the model rather than guessed.
+ * @param model - model id.
+ * @returns the accepted size presets for that model.
+ */
+export function videoSizesFor(model: string): readonly string[] {
+  if (model === 'agnes-video-2.5-flash') return ['720P']
+  if (isVideo25Family(model)) return ['720P', '1080P', '1K', '2K']
+  return ['720P', '1080P', '1K', '2K']
 }
 
 /** Largest frame count the V2.0 model accepts (`8n+1` with n = 55). */
@@ -94,24 +118,35 @@ export interface CreateVideoTaskRequest {
 
 /**
  * Build the provider request body for one task.
+ *
+ * The two families disagree about how an input image is expressed, verified
+ * against the live gateway:
+ *
+ * - V2.0 takes a single `image` string alongside `width`/`height`/`num_frames`.
+ * - The 2.5 family requires `mode`, and image input is the `reference` mode
+ *   carrying an `images` ARRAY. Sending `mode: "image"` or a bare `image` field
+ *   is rejected with `invalid mode`.
+ *
  * @param request - the plugin-level request.
  * @returns the JSON body the gateway expects for this model family.
  */
 function videoRequestBody(request: CreateVideoTaskRequest): Record<string, unknown> {
+  const hasImage = request.imageUrl !== undefined && request.imageUrl.length > 0
   const body: Record<string, unknown> = { model: request.model }
   if (request.prompt !== undefined && request.prompt.length > 0) body.prompt = request.prompt
-  if (request.imageUrl !== undefined && request.imageUrl.length > 0) body.image = request.imageUrl
   if (request.seed !== undefined) body.seed = request.seed
   if (request.negativePrompt !== undefined && request.negativePrompt.length > 0) {
     body.negative_prompt = request.negativePrompt
   }
 
   if (isVideo25Family(request.model)) {
-    body.mode = request.imageUrl !== undefined && request.imageUrl.length > 0 ? 'image' : 'text'
+    body.mode = hasImage ? 'reference' : 'text'
+    if (hasImage) body.images = [request.imageUrl]
     if (request.seconds !== undefined) body.seconds = request.seconds
     body.size = request.size ?? '720P'
     body.aspect_ratio = request.aspectRatio ?? '16:9'
   } else {
+    if (hasImage) body.image = request.imageUrl
     body.width = request.width ?? 1920
     body.height = request.height ?? 1080
     body.num_frames = request.numFrames ?? calculateNumFrames(24, 24)

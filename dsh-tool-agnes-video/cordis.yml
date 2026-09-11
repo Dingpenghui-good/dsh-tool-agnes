@@ -7,14 +7,14 @@
 #       - id: tool-agnes-video
 #         name: '@dingpenghui/agnes-video'
 #         config:
-#           model: agnes-video-v2.0
+#           model: agnes-video-2.5-flash
 #
 # Every key the row owns must be restated, because a patch replaces the
 # targeted row's whole config.
 - id: tool-agnes-video
   name: '@dingpenghui/agnes-video'
   config:
-    model: agnes-video-v2.0
+    model: agnes-video-2.5-flash
     pollIntervalMs: 5000
     timeoutMs: 600000
     maxConsecutiveFailures: 4

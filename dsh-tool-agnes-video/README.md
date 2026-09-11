@@ -7,8 +7,8 @@ DSH 插件：Agnes AI **文生视频**，注册 `generate_video` 与 `get_video_
 - 调用 `POST /v1/videos` 创建异步任务，再轮询 `GET /agnesapi?video_id=…`
 - **默认非阻塞**：渲染以 DSH 后台任务（`ctx.jobs`）运行，调用立即返回 `taskId` + `jobId`
 - 同时支持两代请求形状：
-  - **V2.0**（`agnes-video-v2.0`，免费）：`width` / `height` / `num_frames` / `frame_rate`
-  - **2.5 系列**（按秒计费）：`seconds` / `mode` / `size` / `aspect_ratio`
+  - **2.5 系列**（默认 `agnes-video-2.5-flash`，现价 `$0/秒`）：`seconds` / `mode` / `size` / `aspect_ratio`
+  - **V2.0**（`agnes-video-v2.0`，旧形状）：`width` / `height` / `num_frames` / `frame_rate`
 - 轮询状态机综合 `status` / `internal_status` / `completed_at` / `error` 判定；URL 取**顶层 `url`**
 - 产物下载进附件存储，返回 `attachment`
 - 非瞬时失败（限流、鉴权）立即抛出，只有瞬时错误才计入重试预算
@@ -19,7 +19,7 @@ DSH 插件：Agnes AI **文生视频**，注册 `generate_video` 与 `get_video_
 - id: tool-agnes-video
   name: '@dingpenghui/agnes-video'
   config:
-    model: agnes-video-v2.0      # 或 agnes-video-2.5 / -2.5-flash / -2.5-fast
+    model: agnes-video-2.5-flash # 或 agnes-video-2.5 / -2.5-fast / agnes-video-v2.0
     pollIntervalMs: 5000
     timeoutMs: 900000            # 后台预算；实测一次 8 秒 1080p 约 272 秒
     maxConsecutiveFailures: 4
@@ -66,7 +66,8 @@ DSH 插件：Agnes AI **文生视频**，注册 `generate_video` 与 `get_video_
 ## 注意
 
 - 请求 `1920x1080` 会被服务端吸附为 **`1920x1088`**，返回值里的 `sizeAdjustment` 会说明原因。
-- 免费 Key 对 2.5 系列返回 `429 rate_limit_exceeded`，且**不应立即重试**。
+- 免费额度有速率限制：短时间连续创建任务会 `429 rate_limit_exceeded`，等窗口重置即可，**不应立即重试**。
+- `agnes-video-2.5-flash` 的 `size` 仅支持 `720P`。
 - 后台任务依赖 base bundle 的 `dsh-jobs-local`；缺失时会退化为只报 `taskId`。
 
 ## 开发

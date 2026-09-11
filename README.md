@@ -2,7 +2,7 @@
 
 Agnes AI 媒体生成插件集，为 DeepSeek Harness (DSH) 提供**文生图 / 文生视频 / 图生视频**三种能力。
 
-当前版本：**1.4.0** —— 适配 DSH `0.1.5-rc.2`，针对 Agnes 线上 API 的真实行为做过调用验证，并完成三轮以「可靠性、可维护性、可用性」为目标的优化。
+当前版本：**1.5.0** —— 适配 DSH `0.1.5-rc.2`，针对 Agnes 线上 API 的真实行为做过调用验证，并完成三轮优化；默认模型已切到两个最新的免费模型。
 
 | 插件 | 包名 | 工具 |
 |------|------|------|
@@ -14,7 +14,24 @@ Agnes AI 媒体生成插件集，为 DeepSeek Harness (DSH) 提供**文生图 / 
 
 ---
 
-## 1. 1.4.0 / 1.3.0 / 1.2.0 做了什么
+## 1. 1.5.0 / 1.4.0 / 1.3.0 / 1.2.0 做了什么
+
+### 1.5.0：默认切到最新一代免费模型
+
+| 默认模型 | 说明 |
+|----------|------|
+| `agnes-image-2.5-flash` | 最新一代图像模型，当前免费 |
+| `agnes-video-2.5-flash` | 最新一代视频模型，实测**现价 `$0/秒`**（原 `$0.025/秒`） |
+
+切换过程中实测确认了三件此前**只是猜测**的事：
+
+1. **2.5 系列的图生视频形状与 v2.0 完全不同**：它要求 `mode: "reference"` 并携带 `images` **数组**；传 `mode: "image"` 或裸 `image` 字段会被 `400 invalid mode` 拒绝。请求构造已按族分开。
+2. **2.5 系列完成时 `internal_status` 仍停留在 `pending`、`internal_progress` 仍停留在 `0`**，只有 `status` / `completed_at` / `progress` 会推进。状态机本就优先判定 `completed_at`，因此无需改动即兼容。
+3. **`agnes-video-2.5-flash` 的 `size` 仅接受 `720P`**（Flash 专属限制），这正好是默认值。
+
+顺带实测：2.5-flash 渲染一段 5 秒 720P 视频耗时 **191 秒**，比 v2.0 的 8 秒 1080P（272 秒）快。
+
+> 免费额度仍有**速率限制**：短时间连续创建任务会返回 `429`，等待窗口重置即可，并非模型不可用。
 
 ### 1.4.0：GUI 里粘贴的图片可以直接用
 
@@ -110,7 +127,7 @@ refs:
     - id: tool-agnes-video
       name: '@dingpenghui/agnes-video'
       config:
-        model: agnes-video-v2.0
+        model: agnes-video-2.5-flash
         pollIntervalMs: 5000
         timeoutMs: 900000
         maxConsecutiveFailures: 4
@@ -120,7 +137,7 @@ refs:
     - id: tool-agnes-img2vid
       name: '@dingpenghui/agnes-img2vid'
       config:
-        model: agnes-video-v2.0
+        model: agnes-video-2.5-flash
         pollIntervalMs: 5000
         timeoutMs: 900000
         maxConsecutiveFailures: 4
@@ -160,7 +177,7 @@ pnpm dsh web            # 重启后生效
 | 参数 | 类型 | 默认 | 适用模型 |
 |------|------|------|----------|
 | `prompt` | string | - | 全部（必填） |
-| `model` | string | `agnes-video-v2.0` | 全部 |
+| `model` | string | `agnes-video-2.5-flash` | 全部 |
 | `duration` | integer | `8` | 全部（秒） |
 | `width` / `height` | integer | `1920` / `1080` | 仅 V2.0 |
 | `frameRate` | integer | `24` | 仅 V2.0 |
@@ -209,8 +226,11 @@ pnpm dsh web            # 重启后生效
 | `POST /v1/videos` 的 `image` **接受 `data:` URL**，与公网 URL 等价 | 本地图片/DSH 附件可直接内联，无需图床 |
 | `/v1/files` 上传端点**不存在**（被路由到通配 chat 路径） | 只能走 URL 或 data URL，不能上传换 file id |
 | 请求 `1920x1080` 被吸附为 `1920x1088` | 正常行为，返回值带 `sizeAdjustment` 说明 |
-| 免费 Key 对 2.5 系列视频返回 `429` | 默认模型选免费的 `agnes-video-v2.0` |
-| 图片接口当前免费 | 2.5 视频按秒计费 |
+| `agnes-video-2.5-flash` 现价 `$0/秒` | 2.5 代已成为免费档，默认视频模型切到它 |
+| 2.5 系列的图生视频是 `mode: "reference"` + `images: [...]` | 传 `mode: "image"` 或裸 `image` 字段会 400 `invalid mode` |
+| 2.5 系列完成时 `internal_status` 停在 `pending`、`internal_progress` 停在 `0` | 状态判定必须优先看 `completed_at`（已如此实现） |
+| 免费 Key 有速率限制 | 短时间连续创建任务会 `429`，需等窗口重置，不是模型不可用 |
+| 图片接口当前免费 | 2.5 视频现价 `$0/秒` |
 
 ---
 
@@ -277,7 +297,8 @@ dsh-tool-agnes/
 ## 8. 已知限制
 
 1. **图生图 / 图像编辑不可用**：网关的文本图像队列实测拒绝 `images` 与 `image` 形状，插件不提供该能力。
-2. **2.5 系列视频在当前 Key 上级别不足**：返回 `429`，需要 Token Plan。
+2. **免费额度有速率限制**：短时间连续创建任务会返回 `429 rate_limit_exceeded`，等窗口重置即可恢复，并非模型不可用。
+3. **`agnes-video-2.5-flash` 的 `size` 仅支持 `720P`**：这是 Flash 的专属限制，其它档位会被 400 拒绝。
 3. **后台任务依赖 base bundle 的 `dsh-jobs-local`**：缺失时会退化为「只报 taskId、不自动跟踪」，工具仍可用。
 4. **内联图片有体积上限**：默认 8 MB（`maxInlineImageBytes`）。base64 会膨胀约 33%，超过上限的图片请先压缩或改用公网 URL。
 5. **会话图片窗口只覆盖本次进程内到达的图片**：DSH 重启后，重启之前粘贴的图片不再被索引（重启后新粘贴的图正常）。这是刻意的——该功能回答的是"把刚给我的这张图动起来"。

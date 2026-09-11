@@ -227,11 +227,11 @@ data URL 与公网 URL 等价，因此**不需要图床、上传端点或隧道*
 
 ```
 静态图 ────────────────► generate_image，默认 agnes-image-2.5-flash（当前免费）
-文本驱动的视频 ────────► generate_video，默认 agnes-video-v2.0（免费）
+文本驱动的视频 ────────► generate_video，默认 agnes-video-2.5-flash（免费）
 让一张公网图动起来 ────► generate_img2vid + imageUrl
 ```
 
-`agnes-video-2.5*` 按秒计费，且当前免费 Key 直接 `429`。除非已升级 Token Plan，否则保持 `agnes-video-v2.0`。
+`agnes-video-2.5-flash` 现价 `$0/秒`，已是默认模型；`agnes-video-v2.0` 保留给需要旧请求形状或 `size` 不受限的场景。
 
 ### 4.2 异步工作流
 
