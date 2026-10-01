@@ -13,3 +13,6 @@ lib/
 *.swp
 *.swo
 .DS_Store
+
+# npm credentials (never commit tokens)
+.npmrc

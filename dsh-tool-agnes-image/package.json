@@ -1,6 +1,6 @@
 {
   "name": "@dingpenghui/agnes-image",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "DSH plugin for Agnes AI text-to-image generation",
   "keywords": [
     "deepseek",
@@ -39,10 +39,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-attachment": "^0.1.7-rc.2",
-    "@deepseek-ai/dsh-credentials": "^0.1.7-rc.2",
-    "@deepseek-ai/dsh-llm": "^0.1.7-rc.2",
-    "@deepseek-ai/dsh-tools": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-attachment": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-credentials": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "^0.2.0-rc.2",
     "@deepseek-ai/schemastery": "^3.18.4"
   },
   "peerDependencies": {

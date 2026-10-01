@@ -2,7 +2,7 @@
 
 Agnes AI 媒体生成插件集，为 DeepSeek Harness (DSH) 提供**文生图 / 文生视频 / 图生视频**三种能力。
 
-当前版本：**1.5.1** —— 适配 DSH `0.2.0-rc.2`（SDK `0.1.7-rc.2`），兼容 `0.1.5-rc.2` 线上行为；针对 Agnes API 的真实行为做过调用验证，并完成三轮优化；默认模型为两个最新的免费模型。
+当前版本：**1.6.0** —— 适配 DSH `0.2.0-rc.2`（SDK `0.2.0-rc.2`），新增官方"一个 bundle + 三个组件"形态（`@dingpenghui/agnes`）；针对 Agnes API 的真实行为做过调用验证，并完成三轮优化；默认模型为两个最新的免费模型。
 
 | 插件 | 包名 | 工具 |
 |------|------|------|
@@ -14,7 +14,14 @@ Agnes AI 媒体生成插件集，为 DeepSeek Harness (DSH) 提供**文生图 / 
 
 ---
 
-## 1. 1.5.1 / 1.5.0 / 1.4.0 / 1.3.0 / 1.2.0 做了什么
+## 1. 1.6.0 / 1.5.1 / 1.5.0 / 1.4.0 / 1.3.0 / 1.2.0 做了什么
+
+### 1.6.0：SDK 升到 0.2.0-rc.2 + 官方 bundle 形态
+
+- 所有 `@deepseek-ai/*` 依赖从 `^0.1.7-rc.2` 升到 `^0.2.0-rc.2`（与 DSH 桌面端 `0.2.0-rc.2` 的 next 线对齐；API 契约与 0.1.7 一致，typecheck / 构建 / 全部测试通过）。
+- 新增 bundle 壳包 `@dingpenghui/agnes`（`dsh-tool-agnes-profile/`），对齐官方 `dsh-base` / `dsh-experimental-agent-team-profile` 的"一个 bundle + N 组件"模式：`lib/index.js` 空壳 + `cordis.patch.yml` 一次性 insert 3 个组件行，UI 里一个开关同时启用三套工具。
+- 4 个包纳入同一 `pnpm-workspace.yaml`，新增 `.gitignore` 与 `_verify/bundle-shell-check.mjs`。
+- 发布到 npm 的包名：`@dingpenghui/agnes`（bundle 壳）、`@dingpenghui/agnes-image`、`@dingpenghui/agnes-video`、`@dingpenghui/agnes-img2vid`。
 
 ### 1.5.1：适配 DSH 0.2.0（SDK 0.1.7）
 
@@ -94,7 +101,7 @@ AI  ：generate_img2vid { prompt: "slow push in" }   ← 不带 image
 
 | 项 | 要求 |
 |----|------|
-| DSH | `0.1.7-rc.2` / `0.2.0-rc.2`（依赖声明 `^0.1.7-rc.2`，运行期解析到 profile 实际安装的版本） |
+| DSH | `0.2.0-rc.2`（依赖声明 `^0.2.0-rc.2`，运行期解析到 profile 实际安装的版本） |
 | Node.js | `>= 22`（开发机 24.x） |
 | 凭据 | `AGNES_AI_API_KEY`（旧名 `AGNES_API_KEY` 仍兼容） |
 
