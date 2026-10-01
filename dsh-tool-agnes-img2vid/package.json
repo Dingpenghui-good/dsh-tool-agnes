@@ -1,6 +1,6 @@
 {
   "name": "@dingpenghui/agnes-img2vid",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "DSH plugin for Agnes AI image-to-video generation",
   "keywords": [
     "deepseek",
@@ -39,13 +39,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-agent": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-attachment": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-credentials": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-jobs": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-llm": "^0.1.5-rc.1",
-    "@deepseek-ai/dsh-tools": "^0.1.5-rc.1",
-    "@deepseek-ai/schemastery": "^3.18.2"
+    "@deepseek-ai/dsh-agent": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-attachment": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-credentials": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-jobs": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-llm": "^0.1.7-rc.2",
+    "@deepseek-ai/dsh-tools": "^0.1.7-rc.2",
+    "@deepseek-ai/schemastery": "^3.18.4"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2"
@@ -59,6 +59,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Dingpenghui-good/dsh-tool-agnes.git"
+    "url": "git+https://github.com/Dingpenghui-good/dsh-tool-agnes.git"
   }
 }

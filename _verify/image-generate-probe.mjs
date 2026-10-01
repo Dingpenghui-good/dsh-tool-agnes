@@ -1,7 +1,7 @@
 // Live test: Agnes text-to-image, without the now-rejected `stream` field.
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { dshHome } from './fixtures.mjs'
-import { homedir } from 'node:os'
 
 const key = readFileSync(join(dshHome(), '.credentials.yaml'), 'utf8')
   .match(/AGNES_AI_API_KEY:\s*(\S+)/)?.[1]

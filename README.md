@@ -2,7 +2,7 @@
 
 Agnes AI 媒体生成插件集，为 DeepSeek Harness (DSH) 提供**文生图 / 文生视频 / 图生视频**三种能力。
 
-当前版本：**1.5.0** —— 适配 DSH `0.1.5-rc.2`，针对 Agnes 线上 API 的真实行为做过调用验证，并完成三轮优化；默认模型已切到两个最新的免费模型。
+当前版本：**1.5.1** —— 适配 DSH `0.2.0-rc.2`（SDK `0.1.7-rc.2`），兼容 `0.1.5-rc.2` 线上行为；针对 Agnes API 的真实行为做过调用验证，并完成三轮优化；默认模型为两个最新的免费模型。
 
 | 插件 | 包名 | 工具 |
 |------|------|------|
@@ -14,7 +14,19 @@ Agnes AI 媒体生成插件集，为 DeepSeek Harness (DSH) 提供**文生图 / 
 
 ---
 
-## 1. 1.5.0 / 1.4.0 / 1.3.0 / 1.2.0 做了什么
+## 1. 1.5.1 / 1.5.0 / 1.4.0 / 1.3.0 / 1.2.0 做了什么
+
+### 1.5.1：适配 DSH 0.2.0（SDK 0.1.7）
+
+DSH 主线从 `0.1.5-rc.2` 推进到 `0.2.0-rc.2`（SDK 包 `0.1.7-rc.2`），插件随同升级：
+
+| 变更 | 说明 |
+|------|------|
+| `dsh-jobs` 服务定义重写 | 新版 producer 契约改为同步 `run(job)` 返回 `{ cancel, done }`；owner 由 Agent 改为裸 `SessionId`；终值经 `JobOutcome.result` 传递，读侧从 `{ snapshot, text }` 改为 `JobRead { chunks, result, job }`。`_core/video-job.ts` 已按新契约重写，`get_video_task` 读侧行为不变。 |
+| 消息源声明 | `dsh-llm` 移除了共享的 `kind: 'plugin'` 消息源，生产者需在自己的模块里合并 `MessageSourceMap`。三个插件各自声明 `kind: 'tool-agnes-*'`，`deferContext` 语义不变。 |
+| 依赖 | 所有 `@deepseek-ai/*` 依赖从 `0.1.5-rc.1` 升到 `^0.1.7-rc.2`，`schemastery` 升到 `^3.18.4`。 |
+
+行为、默认模型、工具参数均与 1.5.0 保持一致。
 
 ### 1.5.0：默认切到最新一代免费模型
 
@@ -82,7 +94,7 @@ AI  ：generate_img2vid { prompt: "slow push in" }   ← 不带 image
 
 | 项 | 要求 |
 |----|------|
-| DSH | `0.1.5-rc.2`（依赖声明 `^0.1.5-rc.1`，运行期解析到 profile 实际安装的版本） |
+| DSH | `0.1.7-rc.2` / `0.2.0-rc.2`（依赖声明 `^0.1.7-rc.2`，运行期解析到 profile 实际安装的版本） |
 | Node.js | `>= 22`（开发机 24.x） |
 | 凭据 | `AGNES_AI_API_KEY`（旧名 `AGNES_API_KEY` 仍兼容） |
 

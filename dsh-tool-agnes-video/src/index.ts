@@ -18,6 +18,22 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { readCredential } from '../../_core/credential.ts'
+
+/**
+ * Declare this plugin's message-source contribution for `deferContext` context.
+ *
+ * DSH 0.1.7 removed the shared `kind: 'plugin'` source; producers now merge
+ * their own kinds into `MessageSourceMap`.
+ */
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'tool-agnes-video': {
+      readonly kind: 'tool-agnes-video'
+      readonly form?: 'notice'
+      readonly summary?: string
+    }
+  }
+}
 import { describeFailure } from '../../_core/errors.ts'
 import { AGNES_BASE_URL } from '../../_core/http.ts'
 import { formatBytes } from '../../_core/media.ts'
@@ -361,8 +377,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
           exec.deferContext(createUserMessage({
             content: [{ type: 'text', text: value.text }] as ContentBlock[],
             source: {
-              kind: 'plugin',
-              plugin: name,
+              kind: 'tool-agnes-video',
               form: 'notice',
               summary: `video ${value.status}: ${typed.prompt.slice(0, 80)}`,
             },

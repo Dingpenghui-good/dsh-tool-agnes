@@ -133,9 +133,12 @@ for (const [pkg, toolNames] of Object.entries(expected)) {
   const videoMod = await import(pluginEntry('dsh-tool-agnes-video'))
   videoMod.apply(makeCtx(settledDefs, {
     start: () => 'agnes-video-1',
+    // New API: read() returns { chunks, lossy, result?, job }; result is handed out once.
     read: () => ({
-      text: JSON.stringify(result),
-      snapshot: { id: 'agnes-video-1', kind: 'agnes-video', label: 'x', status: 'completed', startedAt: 0, reported: false },
+      chunks: [],
+      lossy: false,
+      result: JSON.stringify(result),
+      job: { id: 'agnes-video-1', kind: 'agnes-video', label: 'x', status: 'completed', startedAt: 0 },
     }),
   }), CONFIG)
   const settledTool = settledDefs.find(d => d.name === 'get_video_task')
@@ -149,8 +152,9 @@ for (const [pkg, toolNames] of Object.entries(expected)) {
   videoMod.apply(makeCtx(runningDefs, {
     start: () => 'agnes-video-2',
     read: () => ({
-      text: '',
-      snapshot: { id: 'agnes-video-2', kind: 'agnes-video', label: 'x', status: 'running', startedAt: 0, reported: false },
+      chunks: [],
+      lossy: false,
+      job: { id: 'agnes-video-2', kind: 'agnes-video', label: 'x', status: 'running', startedAt: 0 },
     }),
   }), CONFIG)
   const runningValue = await runningDefs.find(d => d.name === 'get_video_task').execute({ jobId: 'agnes-video-2' }, EXEC)

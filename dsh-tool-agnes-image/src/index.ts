@@ -10,7 +10,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
@@ -19,6 +19,23 @@ import { readCredential } from '../../_core/credential.ts'
 import { AGNES_BASE_URL } from '../../_core/http.ts'
 import { IMAGE_MODELS, fetchImageBytes, generateImage } from '../../_core/image.ts'
 import { sniffImageMediaType } from '../../_core/media.ts'
+
+/**
+ * Declare this plugin's message-source contribution for `deferContext` context.
+ *
+ * DSH 0.1.7 removed the shared `kind: 'plugin'` source; producers now merge
+ * their own kinds into `MessageSourceMap`. `createUserMessage` accepts any
+ * `MessageSourceMap` entry, so the plugin declares one under its own name.
+ */
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'tool-agnes-image': {
+      readonly kind: 'tool-agnes-image'
+      readonly form?: 'notice'
+      readonly summary?: string
+    }
+  }
+}
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'tool-agnes-image'
@@ -267,11 +284,10 @@ Endpoint: ${AGNES_BASE_URL}/images/generations · model: ${config.model}`,
         exec.deferContext(createUserMessage({
           content: [{ type: 'text', text: value.text }, imageBlock(attachment)],
           source: {
-            kind: 'plugin',
-            plugin: name,
+            kind: 'tool-agnes-image',
             form: 'notice',
             summary: `generated image: ${typed.prompt.slice(0, 80)}`,
-          },
+          } as MessageSource,
         }))
       }
 
