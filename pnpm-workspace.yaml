@@ -1,0 +1,14 @@
+# dsh-tool-agnes 统一 pnpm workspace
+#
+# 把 4 个包（3 个组件 + 1 个 bundle 壳）纳入同一 workspace：
+#   - 组件包（image / video / img2vid）各自独立可发布，是 host 工具插件
+#   - bundle 壳包（profile）按官方"1 bundle + N 组件"模式组合它们
+#
+# bundle 壳包对组件包的依赖写的是 `^1.5.1`（版本语义），workspace 会让
+# pnpm 自动把同 workspace 内的包解析为本地 link，无需在 package.json 里
+# 写死相对路径；这样发到 registry 后仍保持版本语义，本地开发时走 link。
+packages:
+  - 'dsh-tool-agnes-image'
+  - 'dsh-tool-agnes-video'
+  - 'dsh-tool-agnes-img2vid'
+  - 'dsh-tool-agnes-profile'

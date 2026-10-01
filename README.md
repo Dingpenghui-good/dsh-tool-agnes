@@ -111,7 +111,33 @@ refs:
 
 ## 3. 接入 DSH
 
+### 方式一：Bundle 整体接入（推荐，对齐官方"一个插件 + N 组件"模式）
+
+仓库里有一个 bundle 壳包 `@dingpenghui/agnes`（`dsh-tool-agnes-profile/`），
+它本身不导出运行时代码，只通过 `cordis.patch.yml` 把 3 个组件包一次性
+insert 进 profile——UI 里"一个开关"即可同时启用三套工具，和官方
+`dsh-base`、`dsh-experimental-agent-team-profile` 是同一种形态。
+
 `$DSH_HOME/profiles/web/package.json`：
+
+```json
+{
+  "dependencies": {
+    "@dingpenghui/agnes": "link:E:/dsh-workspace/dsh-tool-agnes/dsh-tool-agnes-profile"
+  }
+}
+```
+
+```powershell
+cd $env:DSH_HOME\profiles\web
+pnpm install            # 建立 link
+```
+
+重启 DSH 后，"插件列表"里会出现一条 `@dingpenghui/agnes`，下面挂 3 个组件
+（`generate_image` / `generate_video`+`get_video_task` / `generate_img2vid`），
+整体勾选或单独关闭某个组件行即可。
+
+### 方式二：组件分别接入（需要只装其中一部分工具）
 
 ```json
 {
@@ -123,7 +149,9 @@ refs:
 }
 ```
 
-`$DSH_HOME/profiles/web/cordis.patch.yml`：
+`$DSH_HOME/profiles/web/cordis.patch.yml`（组件各自的 `dsh.bundle.patch`
+已带默认 config，profile 里只需按需覆写要改的行；patch 替换整行 config，
+覆写时要重述全部保留的键）：
 
 ```yaml
 - insert:
@@ -296,9 +324,14 @@ dsh-tool-agnes/
 │   ├── types.ts                 # 线上报文类型
 │   ├── video.ts                 # 视频任务创建 + 轮询状态机
 │   └── video-job.ts             # DSH 后台任务（异步渲染 + 落盘 + 读取）
-├── dsh-tool-agnes-image/        # 文生图（src/index.ts + cordis.yml + lib/）
-├── dsh-tool-agnes-video/        # 文生视频 + 任务查询
-├── dsh-tool-agnes-img2vid/      # 图生视频
+├── dsh-tool-agnes-image/        # 组件1：文生图（src/index.ts + cordis.yml + lib/）
+├── dsh-tool-agnes-video/        # 组件2：文生视频 + 任务查询
+├── dsh-tool-agnes-img2vid/      # 组件3：图生视频
+├── dsh-tool-agnes-profile/      # Bundle 壳：官方"1 插件 + 3 组件"模式，组合上面 3 个组件
+│   ├── package.json             #   dsh.bundle.patch -> cordis.patch.yml；依赖 3 组件
+│   ├── cordis.patch.yml         #   insert 3 行（tool-agnes-image / -video / -img2vid）
+│   └── lib/index.js             #   空壳 export {}
+├── pnpm-workspace.yaml          # 4 个包纳入同一 workspace（bundle 依赖组件走 link）
 ├── _verify/                     # 单元测试、运行时验收、能力探测
 ├── README.md
 └── OPTIMIZATION.md              # 优化方案与实施状态

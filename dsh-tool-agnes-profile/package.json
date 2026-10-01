@@ -1,0 +1,51 @@
+{
+  "name": "@dingpenghui/agnes",
+  "version": "1.5.1",
+  "description": "Agnes AI 媒体生成 bundle：一个开关挂载 generate_image / generate_video / get_video_task / generate_img2vid 四个工具（三个组件包）",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "cordis-bundle",
+    "cordis-plugin",
+    "agnes",
+    "image-generation",
+    "video-generation",
+    "text-to-image",
+    "text-to-video",
+    "image-to-video"
+  ],
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "package.json"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@dingpenghui/agnes-image": "workspace:^",
+    "@dingpenghui/agnes-video": "workspace:^",
+    "@dingpenghui/agnes-img2vid": "workspace:^"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dingpenghui-good/dsh-tool-agnes.git"
+  }
+}

@@ -1,0 +1,47 @@
+# Agnes AI 媒体生成 bundle 的 patch 层。
+#
+# 一个 bundle，三个组件（对齐官方 dsh-base / dsh-experimental-*-profile 模式）：
+# 这个包本身不导出运行时代码（lib/index.js 是空壳），它只是把这 3 个组件
+# 组件行一次性 insert 进 profile，使得在 UI 里"一个开关"即可同时启用
+# 文生图、文生视频 + 任务查询、图生视频三套工具。
+#
+# 组件各自是独立包，可单独安装 / 单独关闭（关闭时只关对应组件行）；
+# 走 bundle 则整体开关。
+#
+# 每行 `id` 与组件自身 cordis.yml 的行 id 对齐，`name` 指向组件包名；
+# `config` 是组件的默认部署参数，profile 可覆写。
+- insert:
+    # 组件 1：文生图
+    - id: tool-agnes-image
+      name: '@dingpenghui/agnes-image'
+      config:
+        model: agnes-image-2.5-flash
+        defaultSize: 1K
+        defaultRatio: 1:1
+        persistAttachment: true
+        ferryContext: true
+
+    # 组件 2：文生视频 + 任务查询
+    - id: tool-agnes-video
+      name: '@dingpenghui/agnes-video'
+      config:
+        model: agnes-video-2.5-flash
+        pollIntervalMs: 5000
+        timeoutMs: 600000
+        maxConsecutiveFailures: 4
+        ferryContext: true
+        awaitCompletion: false
+        persistVideo: true
+
+    # 组件 3：图生视频
+    - id: tool-agnes-img2vid
+      name: '@dingpenghui/agnes-img2vid'
+      config:
+        model: agnes-video-2.5-flash
+        pollIntervalMs: 5000
+        timeoutMs: 600000
+        maxConsecutiveFailures: 4
+        ferryContext: true
+        awaitCompletion: false
+        persistVideo: true
+        maxInlineImageBytes: 8388608
