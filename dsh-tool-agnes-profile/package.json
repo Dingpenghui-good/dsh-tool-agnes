@@ -1,7 +1,7 @@
-{
+﻿{
     "name":  "@dingpenghui/agnes",
-    "version":  "1.6.1",
-    "description":  "Agnes AI 媒体生成 bundle：一个开关挂载 generate_image / generate_video / get_video_task / generate_img2vid 四个工具（三个组件包）",
+    "version":  "1.6.2",
+    "description":  "Agnes AI 濯掍綋鐢熸垚 bundle锛氫竴涓紑鍏虫寕杞?generate_image / generate_video / get_video_task / generate_img2vid 鍥涗釜宸ュ叿锛堜笁涓粍浠跺寘锛?,
     "keywords":  [
                      "deepseek",
                      "harness",
@@ -36,9 +36,9 @@
                            }
             },
     "dependencies":  {
-                         "@dingpenghui/agnes-image":  "workspace:^",
-                         "@dingpenghui/agnes-video":  "workspace:^",
-                         "@dingpenghui/agnes-img2vid":  "workspace:^"
+                         "@dingpenghui/agnes-image":  "^1.6.1",
+                         "@dingpenghui/agnes-video":  "^1.6.1",
+                         "@dingpenghui/agnes-img2vid":  "^1.6.1"
                      },
     "peerDependencies":  {
                              "@deepseek-ai/cordis":  "^4.0.2"
