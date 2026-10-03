@@ -1,7 +1,7 @@
-﻿{
+{
     "name":  "@dingpenghui/agnes",
     "version":  "1.6.2",
-    "description":  "Agnes AI 濯掍綋鐢熸垚 bundle锛氫竴涓紑鍏虫寕杞?generate_image / generate_video / get_video_task / generate_img2vid 鍥涗釜宸ュ叿锛堜笁涓粍浠跺寘锛?,
+    "description":  "Agnes AI media-generation bundle: one toggle mounts the four tools generate_image / generate_video / get_video_task / generate_img2vid (three component packages)",
     "keywords":  [
                      "deepseek",
                      "harness",
@@ -31,18 +31,18 @@
                   "package.json"
               ],
     "dsh":  {
-                "bundle":  {
-                               "patch":  "./cordis.patch.yml"
-                           }
-            },
+                 "bundle":  {
+                                "patch":  "./cordis.patch.yml"
+                            }
+             },
     "dependencies":  {
                          "@dingpenghui/agnes-image":  "^1.6.1",
                          "@dingpenghui/agnes-video":  "^1.6.1",
                          "@dingpenghui/agnes-img2vid":  "^1.6.1"
                      },
     "peerDependencies":  {
-                             "@deepseek-ai/cordis":  "^4.0.2"
-                         },
+                              "@deepseek-ai/cordis":  "^4.0.2"
+                          },
     "license":  "MIT",
     "repository":  {
                        "type":  "git",
