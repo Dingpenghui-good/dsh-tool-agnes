@@ -1,6 +1,6 @@
 {
   "name": "@dingpenghui/agnes-video",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "DSH plugin for Agnes AI text-to-video generation",
   "keywords": [
     "deepseek",
@@ -38,7 +38,8 @@
     "dev": "tsdown --watch",
     "typecheck": "tsc -p tsconfig.json"
   },
-  "dependencies": {
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
     "@deepseek-ai/dsh-agent": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-attachment": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-credentials": "^0.2.0-rc.2",
@@ -47,11 +48,24 @@
     "@deepseek-ai/dsh-tools": "^0.2.0-rc.2",
     "@deepseek-ai/schemastery": "^3.18.4"
   },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.2"
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-agent": { "optional": true },
+    "@deepseek-ai/dsh-attachment": { "optional": true },
+    "@deepseek-ai/dsh-credentials": { "optional": true },
+    "@deepseek-ai/dsh-jobs": { "optional": true },
+    "@deepseek-ai/dsh-llm": { "optional": true },
+    "@deepseek-ai/dsh-tools": { "optional": true },
+    "@deepseek-ai/schemastery": { "optional": true }
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-attachment": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-credentials": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-jobs": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@deepseek-ai/schemastery": "^3.18.4",
     "@types/node": "^22.20.2",
     "tsdown": "^0.22.14",
     "typescript": "^5.9.3"

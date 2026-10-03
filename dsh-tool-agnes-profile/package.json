@@ -1,6 +1,6 @@
 {
     "name":  "@dingpenghui/agnes",
-    "version":  "1.6.0",
+    "version":  "1.6.1",
     "description":  "Agnes AI 媒体生成 bundle：一个开关挂载 generate_image / generate_video / get_video_task / generate_img2vid 四个工具（三个组件包）",
     "keywords":  [
                      "deepseek",
