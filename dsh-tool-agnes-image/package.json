@@ -1,6 +1,6 @@
 {
   "name": "@dingpenghui/agnes-image",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "DSH plugin for Agnes AI text-to-image generation",
   "keywords": [
     "deepseek",
@@ -28,6 +28,9 @@
     "cordis.yml",
     "README.md"
   ],
+  "engines": {
+    "dsh": ">=0.2.0-rc.2 <0.3.0-0"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.yml"

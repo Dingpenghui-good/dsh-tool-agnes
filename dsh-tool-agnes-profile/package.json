@@ -1,6 +1,6 @@
 {
     "name":  "@dingpenghui/agnes",
-    "version":  "1.6.2",
+    "version":  "1.6.3",
     "description":  "Agnes AI media-generation bundle: one toggle mounts the four tools generate_image / generate_video / get_video_task / generate_img2vid (three component packages)",
     "keywords":  [
                      "deepseek",
@@ -30,6 +30,9 @@
                   "cordis.patch.yml",
                   "package.json"
               ],
+    "engines": {
+        "dsh": ">=0.2.0-rc.2 <0.3.0-0"
+    },
     "dsh":  {
                  "bundle":  {
                                 "patch":  "./cordis.patch.yml"
