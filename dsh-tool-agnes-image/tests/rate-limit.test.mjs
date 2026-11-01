@@ -1,6 +1,11 @@
 // 验证 429 滑动窗口退避逻辑
-import { AgnesApiError } from '../../_core/errors.ts'
-import {
+// `_core/` 在仓库根，pnpm 不在那里装 node_modules，需要钩子把宿主包解析到本子包。
+import { register } from 'node:module'
+
+register('./host-resolver.mjs', import.meta.url)
+
+const { AgnesApiError } = await import('../../_core/errors.ts')
+const {
   DEFAULT_BASE_DELAY_MS,
   DEFAULT_MAX_DELAY_MS,
   RateLimiter,
@@ -9,8 +14,8 @@ import {
   parseRetryAfterMs,
   policyFromConfig,
   resetLimiters,
-} from '../../_core/rate-limit.ts'
-import { agnesJson } from '../../_core/http.ts'
+} = await import('../../_core/rate-limit.ts')
+const { agnesJson } = await import('../../_core/http.ts')
 
 let failed = 0
 const check = (name, ok, extra = '') => {

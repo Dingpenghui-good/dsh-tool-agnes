@@ -39,7 +39,9 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --experimental-strip-types tests/credential-priority.test.mjs && node --experimental-strip-types tests/rate-limit.test.mjs",
+    "verify": "npm run typecheck && npm run test"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",

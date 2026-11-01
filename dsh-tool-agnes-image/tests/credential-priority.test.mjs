@@ -1,5 +1,10 @@
 // 验证 credential 解析优先级逻辑
-import { listKeyCandidates } from '../../_core/credential.ts'
+// `_core/` 在仓库根，ppn 不在那里装 node_modules，需要钩子把宿主包解析到本子包。
+import { register } from 'node:module'
+
+register('./host-resolver.mjs', import.meta.url)
+
+const { listKeyCandidates } = await import('../../_core/credential.ts')
 
 function makeCtx(settingsSection) {
   return {
