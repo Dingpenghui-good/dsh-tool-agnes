@@ -45,6 +45,7 @@ import { resolveImageSource, inlineImageBytes } from '../../_core/image-source.t
 import type { ImageSourceKind, ResolvedImageSource } from '../../_core/image-source.ts'
 import { RecentImageIndex } from '../../_core/recent-images.ts'
 import { formatBytes } from '../../_core/media.ts'
+import { DEFAULT_BASE_DELAY_MS, DEFAULT_MAX_RATE_RETRIES, DEFAULT_RATE_LIMIT, DEFAULT_RATE_WINDOW_MS, policyFromConfig } from '../../_core/rate-limit.ts'
 import {
   DEFAULT_VIDEO_MODEL,
   VIDEO_MODELS,
@@ -92,6 +93,17 @@ export interface Config {
    * llm-pi-ai settings, then the legacy `AGNES_AI_API_KEY`).
    */
   apiKeyEnv: string
+  /**
+   * Requests allowed per rate-limit window for this key. The free tier allows
+   * 6 per 60 seconds; set 0 to disable proactive pacing.
+   */
+  rateLimitRequestsPerWindow: number
+  /** Rate-limit window length in milliseconds. */
+  rateLimitWindowMs: number
+  /** HTTP 429 retries tolerated before the failure is surfaced. */
+  rateLimitMaxRetries: number
+  /** First retry backoff in milliseconds; doubled per attempt. */
+  rateLimitBaseDelayMs: number
 }
 
 /** Schemastery configuration for the image-to-video tool. */
@@ -105,6 +117,10 @@ export const Config: z<Config> = z.object({
   persistVideo: z.boolean().default(true),
   maxInlineImageBytes: z.natural().default(8 * 1024 * 1024),
   apiKeyEnv: z.string().default(''),
+  rateLimitRequestsPerWindow: z.natural().default(DEFAULT_RATE_LIMIT),
+  rateLimitWindowMs: z.natural().default(DEFAULT_RATE_WINDOW_MS),
+  rateLimitMaxRetries: z.natural().default(DEFAULT_MAX_RATE_RETRIES),
+  rateLimitBaseDelayMs: z.natural().default(DEFAULT_BASE_DELAY_MS),
 })
 
 /** Model-facing argument shape of `generate_img2vid`. */
@@ -381,6 +397,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
         model,
         imageUrl: source.value,
         signal: exec.signal,
+        rateLimit: policyFromConfig(config),
         ...(typed.prompt !== undefined ? { prompt: typed.prompt } : {}),
         ...(family25
           ? { seconds: String(duration), size: typed.size ?? '720P', aspectRatio: typed.aspectRatio ?? '16:9' }
@@ -409,7 +426,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
       }
 
       if (config.awaitCompletion) {
-        const settled = await awaitVideoTask(apiKey, created.videoId, model, pollOptions, exec.signal)
+        const settled = await awaitVideoTask(apiKey, created.videoId, model, pollOptions, exec.signal, policyFromConfig(config))
         const value: GenerateImg2VidValue = {
           ...common,
           status: settled.state,
@@ -444,6 +461,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
           model,
           label: `Agnes img2vid: ${imageReference.slice(-48)}`,
           pollOptions,
+          rateLimit: policyFromConfig(config),
           persistVideo: config.persistVideo,
           imageUrl: imageReference,
           ...(typed.prompt !== undefined ? { prompt: typed.prompt } : {}),

@@ -19,6 +19,7 @@ import { readCredential } from '../../_core/credential.ts'
 import { AGNES_BASE_URL } from '../../_core/http.ts'
 import { IMAGE_MODELS, fetchImageBytes, generateImage } from '../../_core/image.ts'
 import { sniffImageMediaType } from '../../_core/media.ts'
+import { DEFAULT_BASE_DELAY_MS, DEFAULT_MAX_RATE_RETRIES, DEFAULT_RATE_LIMIT, DEFAULT_RATE_WINDOW_MS, policyFromConfig } from '../../_core/rate-limit.ts'
 
 /**
  * Declare this plugin's message-source contribution for `deferContext` context.
@@ -69,6 +70,17 @@ export interface Config {
    * llm-pi-ai settings, then the legacy `AGNES_AI_API_KEY`).
    */
   apiKeyEnv: string
+  /**
+   * Requests allowed per rate-limit window for this key. The free tier allows
+   * 6 per 60 seconds; set 0 to disable proactive pacing.
+   */
+  rateLimitRequestsPerWindow: number
+  /** Rate-limit window length in milliseconds. */
+  rateLimitWindowMs: number
+  /** HTTP 429 retries tolerated before the failure is surfaced. */
+  rateLimitMaxRetries: number
+  /** First retry backoff in milliseconds; doubled per attempt. */
+  rateLimitBaseDelayMs: number
 }
 
 /** Schemastery configuration for the image tool. */
@@ -80,6 +92,10 @@ export const Config: z<Config> = z.object({
   ferryContext: z.boolean().default(true),
   timeoutMs: z.natural().default(240_000),
   apiKeyEnv: z.string().default(''),
+  rateLimitRequestsPerWindow: z.natural().default(DEFAULT_RATE_LIMIT),
+  rateLimitWindowMs: z.natural().default(DEFAULT_RATE_WINDOW_MS),
+  rateLimitMaxRetries: z.natural().default(DEFAULT_MAX_RATE_RETRIES),
+  rateLimitBaseDelayMs: z.natural().default(DEFAULT_BASE_DELAY_MS),
 })
 
 /** Model-facing argument shape of `generate_image`. */
@@ -237,6 +253,7 @@ Endpoint: ${AGNES_BASE_URL}/images/generations · model: ${config.model}`,
         ratio,
         signal: exec.signal,
         timeoutMs: config.timeoutMs,
+        rateLimit: policyFromConfig(config),
       })
 
       // Persisting is best-effort. A storage failure must not fail the call:

@@ -17,6 +17,7 @@
 
 import { AgnesApiError, AgnesNetworkError } from './errors.ts'
 import { AGNES_BASE_URL, AGNES_ROOT_URL, agnesJson, downloadBytes, sleep } from './http.ts'
+import type { RateLimitPolicy } from './rate-limit.ts'
 import type { AgnesVideoCreateResponse, AgnesVideoPollResponse } from './types.ts'
 
 /** Video model identifiers currently served by the Agnes gateway. */
@@ -114,6 +115,8 @@ export interface CreateVideoTaskRequest {
   negativePrompt?: string
   /** Caller cancellation. */
   signal: AbortSignal
+  /** Pacing and retry overrides for the free-tier quota. */
+  rateLimit?: Partial<RateLimitPolicy>
 }
 
 /**
@@ -172,6 +175,7 @@ export async function createVideoTask(request: CreateVideoTaskRequest): Promise<
     body: videoRequestBody(request),
     signal: request.signal,
     timeoutMs: 180_000,
+    ...(request.rateLimit !== undefined ? { rateLimit: request.rateLimit } : {}),
   })
 
   const videoId = created.video_id
@@ -289,6 +293,7 @@ export async function pollVideoTaskOnce(
   videoId: string,
   model: string,
   signal: AbortSignal,
+  rateLimit?: Partial<RateLimitPolicy>,
 ): Promise<VideoPollResult> {
   const query = new URLSearchParams({ video_id: videoId })
   if (isVideo25Family(model)) query.set('model_name', model)
@@ -298,6 +303,7 @@ export async function pollVideoTaskOnce(
     method: 'GET',
     signal,
     timeoutMs: 60_000,
+    ...(rateLimit !== undefined ? { rateLimit } : {}),
   })
   return toPollResult(payload, { state: 'queued', progress: 0 })
 }
@@ -323,6 +329,7 @@ export async function awaitVideoTask(
   model: string,
   options: PollOptions,
   signal: AbortSignal,
+  rateLimit?: Partial<RateLimitPolicy>,
 ): Promise<VideoPollResult> {
   const started = Date.now()
   let consecutiveFailures = 0
@@ -341,11 +348,13 @@ export async function awaitVideoTask(
     await sleep(options.intervalMs, signal)
 
     try {
-      last = await pollVideoTaskOnce(apiKey, videoId, model, signal)
+      last = await pollVideoTaskOnce(apiKey, videoId, model, signal, rateLimit)
       consecutiveFailures = 0
     } catch (error) {
       if (signal.aborted) throw error
-      // Rate limiting and auth failures will not fix themselves by retrying.
+      // A 429 has already exhausted its own backoff inside agnesJson, and an
+      // auth failure will never fix itself: neither benefits from the poll
+      // loop retrying as well.
       if (error instanceof AgnesApiError && !error.retryable) throw error
       consecutiveFailures++
       if (consecutiveFailures > options.maxConsecutiveFailures) throw error

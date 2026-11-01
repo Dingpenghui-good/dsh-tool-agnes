@@ -10,6 +10,7 @@
  */
 
 import { AGNES_BASE_URL, agnesJson, downloadBytes } from './http.ts'
+import type { RateLimitPolicy } from './rate-limit.ts'
 import type { AgnesImageResponse } from './types.ts'
 
 /** Image model identifiers currently served by the Agnes gateway. */
@@ -46,6 +47,8 @@ export interface GenerateImageRequest {
   signal: AbortSignal
   /** Per-request time budget. */
   timeoutMs?: number
+  /** Pacing and retry overrides for the free-tier quota. */
+  rateLimit?: Partial<RateLimitPolicy>
 }
 
 /**
@@ -69,6 +72,7 @@ export async function generateImage(request: GenerateImageRequest): Promise<{
     },
     signal: request.signal,
     ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+    ...(request.rateLimit !== undefined ? { rateLimit: request.rateLimit } : {}),
   })
 
   const item = body.data?.[0]

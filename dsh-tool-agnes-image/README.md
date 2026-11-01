@@ -21,7 +21,21 @@ DSH 插件：Agnes AI **文生图**，注册 `generate_image` 工具。
     persistAttachment: true        # 持久化到附件存储并内联渲染
     ferryContext: true             # PTC 子派发时把图片渡回外层结果
     timeoutMs: 240000              # 单次请求预算
+    apiKeyEnv: ''                  # 留空则自动跟随 DSH 配置的 Agnes key
+    rateLimitRequestsPerWindow: 6  # 每窗口请求上限（免费档 6）；0 关闭主动限速
+    rateLimitWindowMs: 60000       # 限速窗口长度
+    rateLimitMaxRetries: 4         # 遇 429 的重试次数
+    rateLimitBaseDelayMs: 3000     # 首次退避基准（指数增长）
 ```
+
+## 429 自动退避
+
+免费档为**每 key 每 60 秒 6 次**。插件分两层处理：
+
+1. **主动限速**（滑动窗口）：按 key 记录请求时间戳，超出配额时先排队等待，从源头避免撞限流。
+2. **被动退避**：万一仍返回 429，按指数退避重试并优先遵循 `Retry-After`；**退避不低于网关 60 秒窗口**，否则会在同一窗口内徒劳重试。
+
+> 若把 `rateLimitWindowMs` 设得比网关窗口短，主动限速会提前放行而由网关拒绝；此时退避仍会等满 60 秒窗口，但会拖慢响应。建议保持默认 60000。
 
 凭据解析顺序（**优先跟随 DSH 已配置的 Agnes key**）：
 

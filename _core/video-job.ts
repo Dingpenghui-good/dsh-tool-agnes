@@ -20,6 +20,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { JobId, JobKind, JobOutcome } from '@deepseek-ai/dsh-jobs'
 import { describeFailure } from './errors.ts'
+import type { RateLimitPolicy } from './rate-limit.ts'
 import { awaitVideoTask, fetchVideoBytes } from './video.ts'
 import type { PollOptions, VideoPollResult, VideoTaskState } from './video.ts'
 
@@ -67,6 +68,8 @@ export interface VideoJobSpec {
   imageUrl?: string
   /** The prompt that was submitted. */
   prompt?: string
+  /** Pacing and retry overrides for the free-tier quota. */
+  rateLimit?: Partial<RateLimitPolicy>
 }
 
 /** Structured result of a finished video job. */
@@ -139,6 +142,7 @@ export function startVideoJob(ctx: Context, owner: Agent | undefined, spec: Vide
             spec.model,
             spec.pollOptions,
             controller.signal,
+            spec.rateLimit,
           )
           const result = await finalize(ctx, spec, settled, controller.signal)
           // Narrate progress through the ring; the terminal value rides `result`.

@@ -37,6 +37,7 @@ declare module '@deepseek-ai/dsh-llm' {
 import { describeFailure } from '../../_core/errors.ts'
 import { AGNES_BASE_URL } from '../../_core/http.ts'
 import { formatBytes } from '../../_core/media.ts'
+import { DEFAULT_BASE_DELAY_MS, DEFAULT_MAX_RATE_RETRIES, DEFAULT_RATE_LIMIT, DEFAULT_RATE_WINDOW_MS, policyFromConfig } from '../../_core/rate-limit.ts'
 import {
   DEFAULT_VIDEO_MODEL,
   VIDEO_MODELS,
@@ -89,6 +90,17 @@ export interface Config {
    * llm-pi-ai settings, then the legacy `AGNES_AI_API_KEY`).
    */
   apiKeyEnv: string
+  /**
+   * Requests allowed per rate-limit window for this key. The free tier allows
+   * 6 per 60 seconds; set 0 to disable proactive pacing.
+   */
+  rateLimitRequestsPerWindow: number
+  /** Rate-limit window length in milliseconds. */
+  rateLimitWindowMs: number
+  /** HTTP 429 retries tolerated before the failure is surfaced. */
+  rateLimitMaxRetries: number
+  /** First retry backoff in milliseconds; doubled per attempt. */
+  rateLimitBaseDelayMs: number
 }
 
 /** Schemastery configuration for the video tools. */
@@ -101,6 +113,10 @@ export const Config: z<Config> = z.object({
   awaitCompletion: z.boolean().default(false),
   persistVideo: z.boolean().default(true),
   apiKeyEnv: z.string().default(''),
+  rateLimitRequestsPerWindow: z.natural().default(DEFAULT_RATE_LIMIT),
+  rateLimitWindowMs: z.natural().default(DEFAULT_RATE_WINDOW_MS),
+  rateLimitMaxRetries: z.natural().default(DEFAULT_MAX_RATE_RETRIES),
+  rateLimitBaseDelayMs: z.natural().default(DEFAULT_BASE_DELAY_MS),
 })
 
 /** Model-facing argument shape of `generate_video`. */
@@ -344,6 +360,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
         model,
         prompt: typed.prompt,
         signal: exec.signal,
+        rateLimit: policyFromConfig(config),
         ...(family25
           ? { seconds: String(duration), size: typed.size ?? '720P', aspectRatio: typed.aspectRatio ?? '16:9' }
           : {
@@ -364,7 +381,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
 
       // ── Blocking mode: keep the whole render inside the tool call. ──────
       if (config.awaitCompletion) {
-        const settled = await awaitVideoTask(apiKey, created.videoId, model, pollOptions, exec.signal)
+        const settled = await awaitVideoTask(apiKey, created.videoId, model, pollOptions, exec.signal, policyFromConfig(config))
         const value: GenerateVideoValue = {
           taskId: created.taskId,
           status: settled.state,
@@ -403,6 +420,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
           model,
           label: `Agnes video: ${typed.prompt.slice(0, 60)}`,
           pollOptions,
+          rateLimit: policyFromConfig(config),
           persistVideo: config.persistVideo,
           prompt: typed.prompt,
         }))

@@ -64,11 +64,11 @@ function classify(status: number, body: AgnesErrorBody | undefined): AgnesFailur
 function adviceFor(kind: AgnesFailureKind, body: AgnesErrorBody | undefined): string {
   switch (kind) {
     case 'auth':
-      return 'The Agnes API key is missing or rejected. Store AGNES_AI_API_KEY in $DSH_HOME/.credentials.yaml (under `refs`) or export the same name, then retry.'
+      return 'The Agnes API key is missing or rejected. Check that the Agnes provider in the llm-pi-ai settings names an `apiKeyEnv` reference (for example AGNESCOM_API_KEY) that resolves in $DSH_HOME/.credentials.yaml or the environment, then retry.'
     case 'forbidden':
       return 'The key is valid but not permitted for this model or endpoint. Check the account plan, or pick a different model.'
     case 'rate-limit':
-      return 'The Agnes rate limit was reached (free tier). Do not retry immediately — wait for the quota window to reset, or upgrade to a Token Plan.'
+      return 'The Agnes free-tier rate limit was reached (6 requests per 60-second window per key) and the automatic retries were exhausted. Raise rateLimitMaxRetries or lower rateLimitRequestsPerWindow in the plugin config, wait for the window to reset, or upgrade to a Token Plan.'
     case 'unsupported-field':
       return `The endpoint rejected a field it no longer accepts: "${body?.message ?? ''}". Remove that field from the request rather than retrying as-is.`
     case 'upstream':
@@ -128,7 +128,13 @@ export class AgnesApiError extends Error {
   }
 
   /**
-   * Whether an immediate retry is worth attempting.
+   * Whether an outer retry loop should attempt this failure again.
+   *
+   * A 429 is deliberately excluded here: {@link agnesJson} already retries it
+   * under the sliding-window policy before the error ever escapes, so a
+   * second retry loop would only multiply the wait without adding a chance
+   * of success.
+   *
    * @returns true only for transient server-side failures.
    */
   get retryable(): boolean {
