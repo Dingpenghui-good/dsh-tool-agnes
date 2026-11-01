@@ -86,6 +86,12 @@ export interface Config {
   persistVideo: boolean
   /** Largest local image inlined into the request as a data URL. */
   maxInlineImageBytes: number
+  /**
+   * Credential reference naming the Agnes API key. Leave unset to follow the
+   * key DSH is configured with (the Agnes providers' `apiKeyEnv` in the
+   * llm-pi-ai settings, then the legacy `AGNES_AI_API_KEY`).
+   */
+  apiKeyEnv: string
 }
 
 /** Schemastery configuration for the image-to-video tool. */
@@ -98,6 +104,7 @@ export const Config: z<Config> = z.object({
   awaitCompletion: z.boolean().default(false),
   persistVideo: z.boolean().default(true),
   maxInlineImageBytes: z.natural().default(8 * 1024 * 1024),
+  apiKeyEnv: z.string().default(''),
 })
 
 /** Model-facing argument shape of `generate_img2vid`. */
@@ -348,7 +355,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
     }),
     async execute(args, exec) {
       const typed = args as GenerateImg2VidArgs
-      const apiKey = await readCredential(ctx)
+      const apiKey = await readCredential(ctx, { apiKeyEnv: config.apiKeyEnv })
       const model = typed.model ?? config.model
       const duration = typed.duration ?? 8
       const frameRate = typed.frameRate ?? 24

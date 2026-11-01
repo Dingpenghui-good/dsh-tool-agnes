@@ -1,6 +1,6 @@
 {
   "name": "@dingpenghui/agnes-img2vid",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "description": "DSH plugin for Agnes AI image-to-video generation",
   "keywords": [
     "deepseek",

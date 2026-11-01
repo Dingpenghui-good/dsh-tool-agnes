@@ -23,7 +23,13 @@ DSH 插件：Agnes AI **文生图**，注册 `generate_image` 工具。
     timeoutMs: 240000              # 单次请求预算
 ```
 
-凭据：`AGNES_AI_API_KEY`（回退 `AGNES_API_KEY`），位于 `$DSH_HOME/.credentials.yaml` 的 `refs` 下或同名环境变量。
+凭据解析顺序（**优先跟随 DSH 已配置的 Agnes key**）：
+
+1. 插件配置 `apiKeyEnv`（显式指定，最高优先级）
+2. DSH `llm-pi-ai` 设置段中 Agnes provider 声明的 `apiKeyEnv`（如 `AGNESCOM_API_KEY` / `AGNESCN_API_KEY`），按声明顺序
+3. 兼容回退：`AGNES_AI_API_KEY` → `AGNES_API_KEY`
+
+引用名在 `$DSH_HOME/.credentials.yaml` 的 `refs` 下或同名环境变量中解析，每次调用热解析，轮换 key 无需重启。
 
 ## 工具参数
 

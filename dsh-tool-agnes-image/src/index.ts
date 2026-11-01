@@ -63,6 +63,12 @@ export interface Config {
   ferryContext: boolean
   /** Per-request time budget in milliseconds. */
   timeoutMs: number
+  /**
+   * Credential reference naming the Agnes API key. Leave unset to follow the
+   * key DSH is configured with (the Agnes providers' `apiKeyEnv` in the
+   * llm-pi-ai settings, then the legacy `AGNES_AI_API_KEY`).
+   */
+  apiKeyEnv: string
 }
 
 /** Schemastery configuration for the image tool. */
@@ -73,6 +79,7 @@ export const Config: z<Config> = z.object({
   persistAttachment: z.boolean().default(true),
   ferryContext: z.boolean().default(true),
   timeoutMs: z.natural().default(240_000),
+  apiKeyEnv: z.string().default(''),
 })
 
 /** Model-facing argument shape of `generate_image`. */
@@ -218,7 +225,7 @@ Endpoint: ${AGNES_BASE_URL}/images/generations · model: ${config.model}`,
     }),
     async execute(args, exec) {
       const typed = args as GenerateImageArgs
-      const apiKey = await readCredential(ctx)
+      const apiKey = await readCredential(ctx, { apiKeyEnv: config.apiKeyEnv })
       const size = typed.size ?? config.defaultSize
       const ratio = typed.ratio ?? config.defaultRatio
 

@@ -83,6 +83,12 @@ export interface Config {
   awaitCompletion: boolean
   /** Whether a finished video is downloaded into the attachment store. */
   persistVideo: boolean
+  /**
+   * Credential reference naming the Agnes API key. Leave unset to follow the
+   * key DSH is configured with (the Agnes providers' `apiKeyEnv` in the
+   * llm-pi-ai settings, then the legacy `AGNES_AI_API_KEY`).
+   */
+  apiKeyEnv: string
 }
 
 /** Schemastery configuration for the video tools. */
@@ -94,6 +100,7 @@ export const Config: z<Config> = z.object({
   ferryContext: z.boolean().default(true),
   awaitCompletion: z.boolean().default(false),
   persistVideo: z.boolean().default(true),
+  apiKeyEnv: z.string().default(''),
 })
 
 /** Model-facing argument shape of `generate_video`. */
@@ -326,7 +333,7 @@ Endpoint: ${AGNES_BASE_URL}/videos · default model: ${config.model}`,
     }),
     async execute(args, exec) {
       const typed = args as GenerateVideoArgs
-      const apiKey = await readCredential(ctx)
+      const apiKey = await readCredential(ctx, { apiKeyEnv: config.apiKeyEnv })
       const model = typed.model ?? config.model
       const duration = typed.duration ?? 8
       const frameRate = typed.frameRate ?? 24
